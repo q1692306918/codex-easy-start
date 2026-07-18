@@ -17,6 +17,24 @@ try { Read-Choices '4' @(1,2,3) | Out-Null } catch { $invalidFailed = $true }
 Assert $invalidFailed '非法选项被拒绝'
 Assert (Test-SupportedWindows) 'Windows 版本检测'
 
+$ccFixture = Join-Path $env:TEMP ("ces-cc-switch-test-" + [Guid]::NewGuid().ToString('N'))
+try {
+    New-Item -ItemType Directory -Path $ccFixture -Force | Out-Null
+    $ccFixtureExe = Join-Path $ccFixture 'cc-switch.exe'
+    [IO.File]::WriteAllText($ccFixtureExe, '')
+    $ccResolver = Get-Command Resolve-CCSwitchExecutable -ErrorAction SilentlyContinue
+    Assert ([bool]$ccResolver) 'CC Switch 提供统一安装位置解析器'
+    if ($ccResolver) {
+        $resolvedCC = Resolve-CCSwitchExecutable -Candidates @() -UninstallEntries @(
+            [pscustomobject]@{ UninstallString = 'MsiExec.exe /X{fixture}' }
+            [pscustomobject]@{ DisplayName = 'CC Switch'; InstallLocation = $ccFixture; DisplayIcon = $null }
+        )
+        Assert ($resolvedCC -eq $ccFixtureExe) '从 MSI 卸载注册表识别自定义安装目录'
+    }
+} finally {
+    Remove-Item -LiteralPath $ccFixture -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 $ranges = @(Get-DownloadRanges 10 4)
 Assert ($ranges.Count -eq 4) '并行下载拆分为四段'
 Assert ($ranges[0].Start -eq 0 -and $ranges[-1].End -eq 9) '下载分段完整覆盖文件'
@@ -45,6 +63,15 @@ $misleadingCodexArtifacts = @($artifacts.artifacts | Where-Object {
 Assert ($misleadingCodexArtifacts.Count -eq 0) 'Codex 制品不再冒充 ChatGPT 安装器'
 $moduleText = Get-Content -LiteralPath (Join-Path $root 'src\CodexEasyStart.psm1') -Raw
 Assert ($moduleText -notmatch 'ChatGPT-Installer|codex-store-bootstrapper') 'Codex 安装流程不再执行 ChatGPT Store Installer'
+$wordingText = @(
+    $moduleText
+    (Get-Content -LiteralPath (Join-Path $root 'PRODUCT.md') -Raw)
+    (Get-Content -LiteralPath (Join-Path $root 'DESIGN.md') -Raw)
+    (Get-Content -LiteralPath (Join-Path $root 'README.md') -Raw)
+    (Get-Content -LiteralPath (Join-Path $root 'docs\ARTIFACTS.md') -Raw)
+) -join "`n"
+Assert ($wordingText -notmatch '其中包含 Codex|Codex 当前包含在|确认包含 Codex') '不再把 ChatGPT 描述成 Codex 容器'
+Assert ($wordingText -match 'Codex 已改名为 ChatGPT') '统一说明 Codex 已改名为 ChatGPT'
 
 $skills = Get-Content -LiteralPath (Join-Path $root 'config\skills.json') -Raw | ConvertFrom-Json
 Assert (@($skills.skills | Where-Object { $_.available -and -not $_.license }).Count -eq 0) '公开镜像 Skill 均有许可证'

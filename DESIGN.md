@@ -1,6 +1,6 @@
 # 交互设计
 
-首次运行先检测 Windows、Codex、CC Switch 和已安装能力，再用结果能力提问，不要求用户理解 MCP、Skill 或模型配置。Windows 官方包显示名为 ChatGPT 时，界面必须直接说明其中包含 Codex，避免用户误以为装错应用。
+首次运行先检测 Windows、ChatGPT（原 Codex）、CC Switch 和已安装能力，再用结果能力提问，不要求用户理解 MCP、Skill 或模型配置。界面必须直接说明“Codex 已改名为 ChatGPT”，避免继续使用“ChatGPT 中包含 Codex”的错误说法。
 
 ```text
 Codex EasyStart

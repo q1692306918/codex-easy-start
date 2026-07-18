@@ -20,6 +20,39 @@ function Get-CodexDesktopPackage {
     return $package
 }
 
+function Resolve-CCSwitchExecutable([string[]]$Candidates, [object[]]$UninstallEntries) {
+    foreach ($candidate in $Candidates) {
+        if ($candidate -and (Test-Path -LiteralPath $candidate)) {
+            return (Get-Item -LiteralPath $candidate).FullName
+        }
+    }
+    foreach ($entry in $UninstallEntries) {
+        $displayNameProperty = $entry.PSObject.Properties['DisplayName']
+        if (-not $displayNameProperty -or [string]$displayNameProperty.Value -notmatch '^CC Switch(?:\s|$)') { continue }
+        $installLocationProperty = $entry.PSObject.Properties['InstallLocation']
+        $installLocation = if ($installLocationProperty) { ([string]$installLocationProperty.Value).Trim().Trim('"') } else { '' }
+        if ($installLocation) {
+            $installedExe = Join-Path $installLocation 'cc-switch.exe'
+            if (Test-Path -LiteralPath $installedExe) { return (Get-Item -LiteralPath $installedExe).FullName }
+        }
+        $displayIconProperty = $entry.PSObject.Properties['DisplayIcon']
+        $displayIcon = if ($displayIconProperty) { ([string]$displayIconProperty.Value).Trim().Trim('"') -replace ',\d+$', '' } else { '' }
+        if ($displayIcon -and (Test-Path -LiteralPath $displayIcon)) {
+            return (Get-Item -LiteralPath $displayIcon).FullName
+        }
+    }
+    return $null
+}
+
+function Get-CCSwitchUninstallEntries {
+    $paths = @(
+        'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+        'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+        'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+    )
+    return @(Get-ItemProperty -Path $paths -ErrorAction SilentlyContinue)
+}
+
 function Get-EasyStartState {
     $codex = Get-CodexDesktopPackage
     $ccCandidates = @(
@@ -27,7 +60,7 @@ function Get-EasyStartState {
         (Join-Path $env:LOCALAPPDATA 'Programs\CC Switch\cc-switch.exe'),
         (Join-Path $env:ProgramFiles 'CC Switch\cc-switch.exe')
     )
-    $cc = $ccCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    $cc = Resolve-CCSwitchExecutable -Candidates $ccCandidates -UninstallEntries (Get-CCSwitchUninstallEntries)
     return [pscustomobject]@{
         CodexInstalled = [bool]$codex
         CodexVersion = if ($codex) { [string]$codex.Version } else { $null }
@@ -154,8 +187,8 @@ function Save-Artifact($Manifest, [string]$Id, [string]$Destination) {
 function Install-CodexDesktop($Manifest, [string]$WorkDir) {
     $state = Get-EasyStartState
     if ($state.CodexInstalled) { Write-Ok "Codex 已安装（$($state.CodexVersion)）"; return $true }
-    Write-Warn 'Windows 官方桌面包当前显示为 ChatGPT，其中包含 Codex；本步骤需要连接 Microsoft Store。'
-    $answer = Read-Host '继续安装包含 Codex 的 OpenAI 官方桌面包？[Y/n]'
+    Write-Warn 'Codex 已改名为 ChatGPT；本步骤需要连接 Microsoft Store。'
+    $answer = Read-Host '继续安装 ChatGPT（原 Codex）？[Y/n]'
     if ($answer -match '^[Nn]') { Write-Skip 'Codex'; return $false }
 
     $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
@@ -170,7 +203,7 @@ function Install-CodexDesktop($Manifest, [string]$WorkDir) {
     $installed = (Get-EasyStartState).CodexInstalled
     if (-not $installed) {
         Start-Process 'ms-windows-store://pdp/?ProductId=9PLM9XGG6VKS'
-        Write-Host '请在 Microsoft Store 完成 ChatGPT 安装；该官方桌面包内含 Codex。'
+        Write-Host '请在 Microsoft Store 完成 ChatGPT（原 Codex）安装。'
         Read-Host '安装完成后回到这里按回车继续' | Out-Null
         $installed = (Get-EasyStartState).CodexInstalled
     }

@@ -58,7 +58,7 @@ try {
         })
     }
     $items.Add([ordered]@{
-        id = 'easy-start-core'; version = '1.0.2'; url = "$BaseUrl/artifacts/easy-start-core.zip"
+        id = 'easy-start-core'; version = '1.0.3'; url = "$BaseUrl/artifacts/easy-start-core.zip"
         file = 'artifacts/easy-start-core.zip'; size = (Get-Item $coreZip).Length
         sha256 = (Get-FileHash -Algorithm SHA256 $coreZip).Hash.ToLowerInvariant()
         source = 'q1692306918/codex-easy-start'; sourceUrl = 'https://github.com/q1692306918/codex-easy-start'
@@ -85,7 +85,7 @@ try {
     [IO.File]::WriteAllText((Join-Path $dist 'manifest.json'), $manifestJson, (New-Object Text.UTF8Encoding($false)))
 
     @"
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Codex EasyStart</title><style>body{font:16px/1.65 system-ui;margin:40px auto;max-width:760px;padding:0 20px;color:#202124}code{background:#f3f4f6;padding:12px;display:block;overflow:auto}small{color:#666}</style><h1>Codex EasyStart</h1><p>在 Windows PowerShell 中运行：</p><code>irm https://plugin.yuniannian.asia/install.ps1 | iex</code><p><small>可镜像文件由境内域名提供并校验 SHA-256。Windows 官方桌面包当前显示为 ChatGPT，其中包含 Codex；安装仍需连接 Microsoft Store。</small></p></html>
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Codex EasyStart</title><style>body{font:16px/1.65 system-ui;margin:40px auto;max-width:760px;padding:0 20px;color:#202124}code{background:#f3f4f6;padding:12px;display:block;overflow:auto}small{color:#666}</style><h1>Codex EasyStart</h1><p>在 Windows PowerShell 中运行：</p><code>irm https://plugin.yuniannian.asia/install.ps1 | iex</code><p><small>可镜像文件由境内域名提供并校验 SHA-256。Codex 已改名为 ChatGPT；安装仍需连接 Microsoft Store。</small></p></html>
 "@ | Set-Content -LiteralPath (Join-Path $dist 'index.html') -Encoding UTF8
 
     $installBytes = [IO.File]::ReadAllBytes((Join-Path $dist 'install.ps1'))
