@@ -54,12 +54,85 @@ function Get-RemoteManifest([string]$BaseUrl) {
     return $response.Content | ConvertFrom-Json
 }
 
+function Get-DownloadRanges([long]$Size, [int]$Count = 4) {
+    if ($Size -le 0) { throw '文件大小必须大于 0。' }
+    $actualCount = [Math]::Min($Count, [int]$Size)
+    $chunkSize = [long][Math]::Ceiling($Size / [double]$actualCount)
+    $ranges = New-Object System.Collections.Generic.List[object]
+    for ($i = 0; $i -lt $actualCount; $i++) {
+        $start = [long]$i * $chunkSize
+        if ($start -ge $Size) { break }
+        $end = [Math]::Min($Size - 1, $start + $chunkSize - 1)
+        $ranges.Add([pscustomobject]@{ Index = $i; Start = $start; End = $end; Length = $end - $start + 1 })
+    }
+    return $ranges.ToArray()
+}
+
+function Save-ParallelDownload([string]$Uri, [string]$Destination, [long]$Size) {
+    $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
+    if (-not $curl) {
+        Invoke-WebRequest -UseBasicParsing -Uri $Uri -OutFile $Destination
+        return
+    }
+    $ranges = @(Get-DownloadRanges $Size 4)
+    $processes = New-Object System.Collections.Generic.List[object]
+    $parts = New-Object System.Collections.Generic.List[string]
+    try {
+        foreach ($range in $ranges) {
+            $part = "$Destination.part$($range.Index)"
+            $parts.Add($part)
+            $arguments = "--fail --silent --show-error --location --range $($range.Start)-$($range.End) --output `"$part`" `"$Uri`""
+            $processes.Add((Start-Process -FilePath $curl.Source -ArgumentList $arguments -WindowStyle Hidden -PassThru))
+        }
+
+        while (@($processes | Where-Object { -not $_.HasExited }).Count -gt 0) {
+            $downloaded = 0L
+            foreach ($part in $parts) {
+                if (Test-Path -LiteralPath $part) { $downloaded += (Get-Item -LiteralPath $part).Length }
+            }
+            $percent = [Math]::Min(99, [int](100 * $downloaded / $Size))
+            Write-Progress -Activity '正在下载' -Status "$percent%" -PercentComplete $percent
+            Start-Sleep -Milliseconds 250
+        }
+
+        foreach ($process in $processes) {
+            $process.Refresh()
+            if ($process.ExitCode -ne 0) { throw "分段下载失败，curl 退出代码：$($process.ExitCode)" }
+        }
+        for ($i = 0; $i -lt $ranges.Count; $i++) {
+            if (-not (Test-Path -LiteralPath $parts[$i]) -or (Get-Item -LiteralPath $parts[$i]).Length -ne $ranges[$i].Length) {
+                throw "下载分段长度不正确：$i"
+            }
+        }
+
+        $output = [IO.File]::Create($Destination)
+        try {
+            foreach ($part in $parts) {
+                $input = [IO.File]::OpenRead($part)
+                try { $input.CopyTo($output) } finally { $input.Dispose() }
+            }
+        } finally { $output.Dispose() }
+        Write-Progress -Activity '正在下载' -Completed
+    } finally {
+        foreach ($process in $processes) {
+            if (-not $process.HasExited) { $process.Kill() }
+            $process.Dispose()
+        }
+        foreach ($part in $parts) { Remove-Item -LiteralPath $part -Force -ErrorAction SilentlyContinue }
+    }
+}
+
 function Save-Artifact($Manifest, [string]$Id, [string]$Destination) {
     $artifact = $Manifest.artifacts | Where-Object { $_.id -eq $Id } | Select-Object -First 1
     if (-not $artifact) { throw "镜像中没有制品：$Id" }
+    Write-Host "  正在下载 $Id（$([Math]::Round([long]$artifact.size / 1MB, 1)) MB）..."
     $parent = Split-Path -Parent $Destination
     if ($parent) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
-    Invoke-WebRequest -UseBasicParsing -Uri $artifact.url -OutFile $Destination
+    if ([long]$artifact.size -ge 4MB) {
+        Save-ParallelDownload -Uri $artifact.url -Destination $Destination -Size ([long]$artifact.size)
+    } else {
+        Invoke-WebRequest -UseBasicParsing -Uri $artifact.url -OutFile $Destination
+    }
     $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Destination).Hash.ToLowerInvariant()
     if ($actual -ne ([string]$artifact.sha256).ToLowerInvariant()) {
         Remove-Item -LiteralPath $Destination -Force -ErrorAction SilentlyContinue
@@ -163,8 +236,13 @@ function Configure-DeepSeek($Manifest, [string]$WorkDir) {
 function Configure-Ocr([string]$PackageRoot, [string[]]$Plugins) {
     Write-Step '配置图片与扫描件识别'
     Write-Host '让 DeepSeek 等不能直接看图的模型获得识图能力；原生支持图片的模型无需安装。'
-    Start-Process 'https://bailian.console.aliyun.com/'
-    $key = Read-Secret '请输入百炼 API Key（输入不会显示，直接回车跳过）'
+    $key = [Environment]::GetEnvironmentVariable('DASHSCOPE_API_KEY', 'User')
+    if ($key -and (Read-Host '检测到已保存的百炼 API Key，继续沿用？[Y/n]') -notmatch '^[Nn]') {
+        Write-Host '将沿用已保存的百炼 API Key。'
+    } else {
+        Start-Process 'https://bailian.console.aliyun.com/'
+        $key = Read-Secret '请输入百炼 API Key（输入不会显示，直接回车跳过）'
+    }
     if (-not $key) { Write-Skip '图片识别'; return $false }
     $pixel = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII='
     $testBody = @{
@@ -187,7 +265,12 @@ function Configure-Ocr([string]$PackageRoot, [string[]]$Plugins) {
 
 function Configure-PKULaw([string]$PackageRoot, [string[]]$Plugins) {
     Write-Step '配置北大法宝'
-    $key = Read-Secret '请输入北大法宝 Access Token（直接回车跳过）'
+    $key = [Environment]::GetEnvironmentVariable('PKULAW_ACCESS_TOKEN', 'User')
+    if ($key -and (Read-Host '检测到已保存的北大法宝 Token，继续沿用？[Y/n]') -notmatch '^[Nn]') {
+        Write-Host '将沿用已保存的北大法宝 Token。'
+    } else {
+        $key = Read-Secret '请输入北大法宝 Access Token（直接回车跳过）'
+    }
     if (-not $key) { Write-Skip '北大法宝'; return $false }
     $init = @{ jsonrpc = '2.0'; id = 1; method = 'initialize'; params = @{ protocolVersion = '2025-03-26'; capabilities = @{}; clientInfo = @{ name = 'Codex EasyStart'; version = '1.0.0' } } } | ConvertTo-Json -Depth 8
     try {
@@ -201,25 +284,36 @@ function Configure-PKULaw([string]$PackageRoot, [string[]]$Plugins) {
     return $true
 }
 
+function Expand-SingleSkillArchive([string]$Zip, [string]$Target, [string]$Name) {
+    if (Test-Path -LiteralPath $Target) { throw "$Name 已存在，未覆盖。" }
+    $destinationRoot = Split-Path -Parent $Target
+    New-Item -ItemType Directory -Path $destinationRoot -Force | Out-Null
+    $staging = Join-Path $destinationRoot ('.easystart-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $staging -Force | Out-Null
+    try {
+        $tar = Get-Command tar.exe -ErrorAction SilentlyContinue
+        if (-not $tar) { throw '系统缺少 tar.exe，请确认正在使用 Windows 10/11。' }
+        & $tar.Source -xf $Zip -C $staging --strip-components 1
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $staging 'SKILL.md'))) {
+            throw "Skill 解压失败：$Name"
+        }
+        [IO.Directory]::Move($staging, $Target)
+    } finally {
+        if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+}
+
 function Install-SkillArchive($Manifest, $Skill, [string]$WorkDir) {
+    $destinationRoot = Join-Path $HOME '.agents\skills'
+    $target = Join-Path $destinationRoot ([string]$Skill.name)
+    if (Test-Path -LiteralPath $target) {
+        Write-Warn "$($Skill.name) 已存在，未覆盖"
+        return
+    }
     $id = 'skill-' + $Skill.id
     $zip = Join-Path $WorkDir ($Skill.id + '.zip')
     Save-Artifact $Manifest $id $zip | Out-Null
-    $unpack = Join-Path $WorkDir ($Skill.id + '-unpack')
-    Expand-Archive -LiteralPath $zip -DestinationPath $unpack -Force
-    $skillFiles = Get-ChildItem -LiteralPath $unpack -Filter 'SKILL.md' -Recurse -File
-    if (-not $skillFiles) { throw "Skill 包中没有 SKILL.md：$($Skill.name)" }
-    $destinationRoot = Join-Path $HOME '.agents\skills'
-    New-Item -ItemType Directory -Path $destinationRoot -Force | Out-Null
-    foreach ($file in $skillFiles) {
-        $sourceDir = $file.Directory.FullName
-        $target = Join-Path $destinationRoot $file.Directory.Name
-        if (Test-Path -LiteralPath $target) {
-            Write-Warn "$($file.Directory.Name) 已存在，未覆盖"
-            continue
-        }
-        Copy-Item -LiteralPath $sourceDir -Destination $target -Recurse -Force
-    }
+    Expand-SingleSkillArchive -Zip $zip -Target $target -Name ([string]$Skill.name)
     Write-Ok "$($Skill.name) 已安装"
 }
 

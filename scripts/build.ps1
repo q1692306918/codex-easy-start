@@ -12,6 +12,11 @@ function Write-Utf8Bom([string]$Path) {
     [IO.File]::WriteAllText($Path, $text, $utf8Bom)
 }
 
+function Write-Utf8NoBom([string]$Path) {
+    $text = [IO.File]::ReadAllText($Path)
+    [IO.File]::WriteAllText($Path, $text, (New-Object Text.UTF8Encoding($false)))
+}
+
 try {
     if (-not (Test-Path -LiteralPath $vendor)) { throw '缺少 vendor，先运行 scripts/sync-artifacts.ps1。' }
     Remove-Item -LiteralPath $dist -Recurse -Force -ErrorAction SilentlyContinue
@@ -31,7 +36,7 @@ try {
     Copy-Item -Path (Join-Path $vendor 'artifacts\*') -Destination (Join-Path $dist 'artifacts') -Force
     Copy-Item -Path (Join-Path $vendor 'skills\*') -Destination (Join-Path $dist 'skills') -Force
     Copy-Item -LiteralPath (Join-Path $root 'install.ps1') -Destination (Join-Path $dist 'install.ps1') -Force
-    Write-Utf8Bom (Join-Path $dist 'install.ps1')
+    Write-Utf8NoBom (Join-Path $dist 'install.ps1')
 
     $source = Get-Content -LiteralPath (Join-Path $root 'config\artifacts.json') -Raw | ConvertFrom-Json
     $items = New-Object System.Collections.Generic.List[object]
@@ -47,7 +52,7 @@ try {
         })
     }
     $items.Add([ordered]@{
-        id = 'easy-start-core'; version = '1.0.0'; url = "$BaseUrl/artifacts/easy-start-core.zip"
+        id = 'easy-start-core'; version = '1.0.1'; url = "$BaseUrl/artifacts/easy-start-core.zip"
         file = 'artifacts/easy-start-core.zip'; size = (Get-Item $coreZip).Length
         sha256 = (Get-FileHash -Algorithm SHA256 $coreZip).Hash.ToLowerInvariant()
         source = 'q1692306918/codex-easy-start'; sourceUrl = 'https://github.com/q1692306918/codex-easy-start'
@@ -76,6 +81,24 @@ try {
     @"
 <!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Codex EasyStart</title><style>body{font:16px/1.65 system-ui;margin:40px auto;max-width:760px;padding:0 20px;color:#202124}code{background:#f3f4f6;padding:12px;display:block;overflow:auto}small{color:#666}</style><h1>Codex EasyStart</h1><p>在 Windows PowerShell 中运行：</p><code>irm https://plugin.yuniannian.asia/install.ps1 | iex</code><p><small>安装文件由境内镜像提供并校验 SHA-256。Codex 官方启动器仍可能需要连接微软服务。</small></p></html>
 "@ | Set-Content -LiteralPath (Join-Path $dist 'index.html') -Encoding UTF8
+
+    $installBytes = [IO.File]::ReadAllBytes((Join-Path $dist 'install.ps1'))
+    if ($installBytes.Length -ge 3 -and $installBytes[0] -eq 0xEF -and $installBytes[1] -eq 0xBB -and $installBytes[2] -eq 0xBF) {
+        throw '发布入口 install.ps1 不能包含 UTF-8 BOM，否则 irm | iex 会把 BOM 识别为命令字符。'
+    }
+    Get-ChildItem -LiteralPath (Join-Path $dist 'skills') -Filter '*.zip' -File | ForEach-Object {
+        $entries = @(& tar.exe -tf $_.FullName)
+        $skillEntries = @($entries | Where-Object { $_ -match '/SKILL\.md$' })
+        if ($LASTEXITCODE -ne 0 -or $skillEntries.Count -ne 1) {
+            throw "Skill 发布包无效：$($_.Name)"
+        }
+        $verifyDirectory = Join-Path $stage ("verify-" + $_.BaseName)
+        New-Item -ItemType Directory -Path $verifyDirectory -Force | Out-Null
+        & tar.exe -xf $_.FullName -C $verifyDirectory
+        if ($LASTEXITCODE -ne 0 -or -not (Get-ChildItem -LiteralPath $verifyDirectory -Filter 'SKILL.md' -Recurse -File)) {
+            throw "Skill 发布包无法通过 tar.exe 解压：$($_.Name)"
+        }
+    }
     Write-Host "发布目录已生成：$dist" -ForegroundColor Green
 } finally {
     Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue

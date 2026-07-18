@@ -17,6 +17,25 @@ try { Read-Choices '4' @(1,2,3) | Out-Null } catch { $invalidFailed = $true }
 Assert $invalidFailed '非法选项被拒绝'
 Assert (Test-SupportedWindows) 'Windows 版本检测'
 
+$ranges = @(Get-DownloadRanges 10 4)
+Assert ($ranges.Count -eq 4) '并行下载拆分为四段'
+Assert ($ranges[0].Start -eq 0 -and $ranges[-1].End -eq 9) '下载分段完整覆盖文件'
+Assert ((($ranges | Measure-Object Length -Sum).Sum) -eq 10) '下载分段没有重复或遗漏'
+
+$fixture = Join-Path $env:TEMP ("ces-skill-test-" + [Guid]::NewGuid().ToString('N'))
+$fixtureSource = Join-Path $fixture 'source\upstream-name'
+$fixtureTarget = Join-Path $fixture 'target\stable-skill'
+try {
+    New-Item -ItemType Directory -Path $fixtureSource -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $fixtureSource 'SKILL.md'), '# fixture')
+    $fixtureZip = Join-Path $fixture 'fixture.zip'
+    & tar.exe -a -cf $fixtureZip -C (Join-Path $fixture 'source') 'upstream-name'
+    Expand-SingleSkillArchive -Zip $fixtureZip -Target $fixtureTarget -Name 'stable-skill'
+    Assert (Test-Path -LiteralPath (Join-Path $fixtureTarget 'SKILL.md')) '单 Skill 绕过外层目录安装到稳定目录'
+} finally {
+    Remove-Item -LiteralPath $fixture -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 $artifacts = Get-Content -LiteralPath (Join-Path $root 'config\artifacts.json') -Raw | ConvertFrom-Json
 Assert ($artifacts.baseUrl -eq 'https://plugin.yuniannian.asia') '镜像域名正确'
 Assert (@($artifacts.artifacts | Where-Object { -not $_.id -or -not $_.file }).Count -eq 0) '制品字段完整'
