@@ -11,7 +11,7 @@
 
 ## 收录原则
 
-- Codex：镜像官方 Store 启动器，`offlineReady: false`。
+- Codex：不镜像 Store Installer。安装器优先调用系统 `winget` 的 Microsoft Store 源，失败时打开同一商品页；官方包显示名为 ChatGPT，并通过 `codex://` 协议确认包含 Codex。
 - CC Switch：镜像固定版本 Windows MSI，`offlineReady: true`。
 - EasyStart：安装脚本、核心包、两个插件全部镜像，`offlineReady: true`。
 - Skills：仅镜像许可证允许再分发的固定版本。无许可证项目保留元数据但不公开复制，安装器自动隐藏不可用项。

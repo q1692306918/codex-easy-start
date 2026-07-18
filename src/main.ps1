@@ -15,7 +15,7 @@ try {
     Write-Host "`nCodex EasyStart" -ForegroundColor White
     Write-Host '一条命令，装好 Codex 和需要的能力。' -ForegroundColor DarkGray
     $state = Get-EasyStartState
-    Write-Host "`n  Codex       $(if ($state.CodexInstalled) { '已安装' } else { '未安装' })"
+    Write-Host "`n  Codex       $(if ($state.CodexInstalled) { '已安装（Windows 中显示为 ChatGPT）' } else { '未安装' })"
     Write-Host "  CC Switch   $(if ($state.CCSwitchInstalled) { '已安装' } else { '未安装' })"
     Write-Host "  插件         $(if ($state.MarketplaceInstalled) { '已安装' } else { '未安装' })"
 
@@ -46,11 +46,11 @@ try {
 
     Write-Host "`n完成" -ForegroundColor Green
     $final = Get-EasyStartState
-    Write-Host "  Codex       $(if ($final.CodexInstalled) { '已安装' } else { '需要处理' })"
+    Write-Host "  Codex       $(if ($final.CodexInstalled) { '已安装（Windows 中显示为 ChatGPT）' } else { '需要处理' })"
     Write-Host "  CC Switch   $(if ($final.CCSwitchInstalled) { '已安装' } else { '未选择' })"
     Write-Host "  插件         $(if ($final.MarketplaceInstalled) { '已安装，重启 Codex 生效' } else { '未选择' })"
     if ($final.CodexInstalled -and (Read-Host '现在打开 Codex？[Y/n]') -notmatch '^[Nn]') {
-        Start-Process explorer.exe -ArgumentList 'shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App' -ErrorAction SilentlyContinue
+        Open-CodexDesktop
     }
 } finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

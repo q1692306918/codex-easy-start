@@ -10,8 +10,18 @@ function Test-SupportedWindows {
     return ($env:OS -eq 'Windows_NT' -and [Environment]::OSVersion.Version.Major -ge 10)
 }
 
+function Get-CodexDesktopPackage {
+    $package = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $package) { return $null }
+    $manifestPath = Join-Path $package.InstallLocation 'AppxManifest.xml'
+    if (-not (Test-Path -LiteralPath $manifestPath)) { return $null }
+    $manifestText = Get-Content -LiteralPath $manifestPath -Raw
+    if ($manifestText -notmatch '<uap:Protocol\s+Name="codex"') { return $null }
+    return $package
+}
+
 function Get-EasyStartState {
-    $codex = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue
+    $codex = Get-CodexDesktopPackage
     $ccCandidates = @(
         (Join-Path $env:LOCALAPPDATA 'CC-Switch\cc-switch.exe'),
         (Join-Path $env:LOCALAPPDATA 'Programs\CC Switch\cc-switch.exe'),
@@ -144,19 +154,33 @@ function Save-Artifact($Manifest, [string]$Id, [string]$Destination) {
 function Install-CodexDesktop($Manifest, [string]$WorkDir) {
     $state = Get-EasyStartState
     if ($state.CodexInstalled) { Write-Ok "Codex 已安装（$($state.CodexVersion)）"; return $true }
-    Write-Warn 'Codex 完整离线包暂不可公开镜像；接下来运行的是官方微软安装入口，可能需要访问微软服务。'
-    $answer = Read-Host '继续打开 Codex 官方安装器？[Y/n]'
+    Write-Warn 'Windows 官方桌面包当前显示为 ChatGPT，其中包含 Codex；本步骤需要连接 Microsoft Store。'
+    $answer = Read-Host '继续安装包含 Codex 的 OpenAI 官方桌面包？[Y/n]'
     if ($answer -match '^[Nn]') { Write-Skip 'Codex'; return $false }
-    $path = Join-Path $WorkDir 'ChatGPT-Installer.exe'
-    Save-Artifact $Manifest 'codex-store-bootstrapper' $path | Out-Null
-    $signature = Get-AuthenticodeSignature -LiteralPath $path
-    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
-        throw 'Codex 官方启动器的 Microsoft 签名无效，已停止执行。'
+
+    $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+    if ($winget) {
+        Write-Host '  正在通过 Microsoft Store 安装 OpenAI 官方桌面包...'
+        & $winget.Source install --id 9PLM9XGG6VKS --source msstore --accept-package-agreements --accept-source-agreements --disable-interactivity
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn "Microsoft Store 命令安装未完成（代码 $LASTEXITCODE），将打开商店页面。"
+        }
     }
-    Start-Process -FilePath $path -Wait
+
     $installed = (Get-EasyStartState).CodexInstalled
+    if (-not $installed) {
+        Start-Process 'ms-windows-store://pdp/?ProductId=9PLM9XGG6VKS'
+        Write-Host '请在 Microsoft Store 完成 ChatGPT 安装；该官方桌面包内含 Codex。'
+        Read-Host '安装完成后回到这里按回车继续' | Out-Null
+        $installed = (Get-EasyStartState).CodexInstalled
+    }
     if ($installed) { Write-Ok 'Codex 已安装' } else { Write-Warn '尚未检测到 Codex，可稍后再次运行 EasyStart 检查。' }
     return $installed
+}
+
+function Open-CodexDesktop {
+    try { Start-Process 'codex:' -ErrorAction Stop }
+    catch { Start-Process explorer.exe -ArgumentList 'shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App' -ErrorAction SilentlyContinue }
 }
 
 function Install-CCSwitch($Manifest, [string]$WorkDir) {

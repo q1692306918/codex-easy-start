@@ -3,16 +3,6 @@
   "baseUrl": "https://plugin.yuniannian.asia",
   "artifacts": [
     {
-      "id": "codex-store-bootstrapper",
-      "version": "2026-07-18",
-      "file": "artifacts/ChatGPT-Installer.exe",
-      "source": "Microsoft Store official bootstrapper",
-      "sourceUrl": "https://apps.microsoft.com/detail/9PLM9XGG6VKS",
-      "license": "Proprietary",
-      "offlineReady": false,
-      "sha256": "BUILD_TIME"
-    },
-    {
       "id": "cc-switch-x64",
       "version": "3.17.0",
       "file": "artifacts/CC-Switch-v3.17.0-Windows.msi",
@@ -34,4 +24,3 @@
     }
   ]
 }
-

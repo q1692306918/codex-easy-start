@@ -1,5 +1,4 @@
 ﻿param(
-    [string]$CodexBootstrapperPath = "$HOME\Downloads\ChatGPT Installer.exe",
     [string]$GitHubProxy = 'https://gh-proxy.com/',
     [switch]$Force
 )
@@ -38,16 +37,6 @@ Save-Remote 'https://github.com/farion1231/cc-switch/releases/download/v3.17.0/C
 Save-Remote 'https://github.com/farion1231/cc-switch/releases/download/v3.17.0/CC-Switch-v3.17.0-Windows-arm64.msi' `
     (Join-Path $vendor 'artifacts\CC-Switch-v3.17.0-Windows-arm64.msi') `
     'e3b5c01d4d12914f3f98f715d386aeddb9ceaa39981984cb05f3050163933b6e'
-
-if (-not (Test-Path -LiteralPath $CodexBootstrapperPath)) {
-    throw "未找到微软官方启动器：$CodexBootstrapperPath"
-}
-Copy-Item -LiteralPath $CodexBootstrapperPath -Destination (Join-Path $vendor 'artifacts\ChatGPT-Installer.exe') -Force
-$codexPath = Join-Path $vendor 'artifacts\ChatGPT-Installer.exe'
-$signature = Get-AuthenticodeSignature -LiteralPath $codexPath
-if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
-    throw 'Codex 官方启动器的 Microsoft 签名无效。'
-}
 
 Save-Remote 'https://github.com/Daknniel-0881/qulv-china-legal-counsel-skill/archive/73ff53a857ffbdd91296bf41ed5bcc1294bc2042.zip' `
     (Join-Path $vendor 'skills\china-legal-counsel.zip') `

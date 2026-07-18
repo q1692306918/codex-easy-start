@@ -33,12 +33,18 @@ try {
 
     $coreZip = Join-Path $dist 'artifacts\easy-start-core.zip'
     Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $coreZip -CompressionLevel Optimal
-    Copy-Item -Path (Join-Path $vendor 'artifacts\*') -Destination (Join-Path $dist 'artifacts') -Force
+    $source = Get-Content -LiteralPath (Join-Path $root 'config\artifacts.json') -Raw | ConvertFrom-Json
+    foreach ($entry in $source.artifacts) {
+        $sourcePath = Join-Path $vendor ([string]$entry.file)
+        $destinationPath = Join-Path $dist ([string]$entry.file)
+        if (-not (Test-Path -LiteralPath $sourcePath)) { throw "镜像文件不存在：$($entry.file)" }
+        New-Item -ItemType Directory -Path (Split-Path -Parent $destinationPath) -Force | Out-Null
+        Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
+    }
     Copy-Item -Path (Join-Path $vendor 'skills\*') -Destination (Join-Path $dist 'skills') -Force
     Copy-Item -LiteralPath (Join-Path $root 'install.ps1') -Destination (Join-Path $dist 'install.ps1') -Force
     Write-Utf8NoBom (Join-Path $dist 'install.ps1')
 
-    $source = Get-Content -LiteralPath (Join-Path $root 'config\artifacts.json') -Raw | ConvertFrom-Json
     $items = New-Object System.Collections.Generic.List[object]
     foreach ($entry in $source.artifacts) {
         $path = Join-Path $dist ([string]$entry.file)
@@ -52,7 +58,7 @@ try {
         })
     }
     $items.Add([ordered]@{
-        id = 'easy-start-core'; version = '1.0.1'; url = "$BaseUrl/artifacts/easy-start-core.zip"
+        id = 'easy-start-core'; version = '1.0.2'; url = "$BaseUrl/artifacts/easy-start-core.zip"
         file = 'artifacts/easy-start-core.zip'; size = (Get-Item $coreZip).Length
         sha256 = (Get-FileHash -Algorithm SHA256 $coreZip).Hash.ToLowerInvariant()
         source = 'q1692306918/codex-easy-start'; sourceUrl = 'https://github.com/q1692306918/codex-easy-start'
@@ -79,7 +85,7 @@ try {
     [IO.File]::WriteAllText((Join-Path $dist 'manifest.json'), $manifestJson, (New-Object Text.UTF8Encoding($false)))
 
     @"
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Codex EasyStart</title><style>body{font:16px/1.65 system-ui;margin:40px auto;max-width:760px;padding:0 20px;color:#202124}code{background:#f3f4f6;padding:12px;display:block;overflow:auto}small{color:#666}</style><h1>Codex EasyStart</h1><p>在 Windows PowerShell 中运行：</p><code>irm https://plugin.yuniannian.asia/install.ps1 | iex</code><p><small>安装文件由境内镜像提供并校验 SHA-256。Codex 官方启动器仍可能需要连接微软服务。</small></p></html>
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Codex EasyStart</title><style>body{font:16px/1.65 system-ui;margin:40px auto;max-width:760px;padding:0 20px;color:#202124}code{background:#f3f4f6;padding:12px;display:block;overflow:auto}small{color:#666}</style><h1>Codex EasyStart</h1><p>在 Windows PowerShell 中运行：</p><code>irm https://plugin.yuniannian.asia/install.ps1 | iex</code><p><small>可镜像文件由境内域名提供并校验 SHA-256。Windows 官方桌面包当前显示为 ChatGPT，其中包含 Codex；安装仍需连接 Microsoft Store。</small></p></html>
 "@ | Set-Content -LiteralPath (Join-Path $dist 'index.html') -Encoding UTF8
 
     $installBytes = [IO.File]::ReadAllBytes((Join-Path $dist 'install.ps1'))

@@ -39,7 +39,12 @@ try {
 $artifacts = Get-Content -LiteralPath (Join-Path $root 'config\artifacts.json') -Raw | ConvertFrom-Json
 Assert ($artifacts.baseUrl -eq 'https://plugin.yuniannian.asia') '镜像域名正确'
 Assert (@($artifacts.artifacts | Where-Object { -not $_.id -or -not $_.file }).Count -eq 0) '制品字段完整'
-Assert (-not [bool]($artifacts.artifacts | Where-Object { $_.id -eq 'codex-store-bootstrapper' }).offlineReady) 'Codex 启动器未伪装离线包'
+$misleadingCodexArtifacts = @($artifacts.artifacts | Where-Object {
+    $_.id -match 'codex' -and (($_.file + ' ' + $_.sourceUrl) -match 'ChatGPT|9PLM9XGG6VKS')
+})
+Assert ($misleadingCodexArtifacts.Count -eq 0) 'Codex 制品不再冒充 ChatGPT 安装器'
+$moduleText = Get-Content -LiteralPath (Join-Path $root 'src\CodexEasyStart.psm1') -Raw
+Assert ($moduleText -notmatch 'ChatGPT-Installer|codex-store-bootstrapper') 'Codex 安装流程不再执行 ChatGPT Store Installer'
 
 $skills = Get-Content -LiteralPath (Join-Path $root 'config\skills.json') -Raw | ConvertFrom-Json
 Assert (@($skills.skills | Where-Object { $_.available -and -not $_.license }).Count -eq 0) '公开镜像 Skill 均有许可证'
