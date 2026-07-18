@@ -8,8 +8,9 @@
 4. 断开境外网络后，确认 EasyStart、CC Switch、插件和可镜像 Skills 仍从域名成功下载并通过哈希校验。
 5. 确认 ChatGPT（原 Codex）未安装时明确提示微软联网限制，并说明“Codex 已改名为 ChatGPT”。
 6. 确认安装流程不再下载或执行 `ChatGPT-Installer.exe`；优先使用 Microsoft Store 命令安装，失败时才打开商店页面。
-7. DeepSeek 路径中确认 Key 输入不回显，CC Switch 显示导入确认。
-8. OCR 使用测试图片完成一次真实识别；原生多模态提示可跳过。
-9. 北大法宝完成一次最小检索调用。
-10. 重启 Codex，确认已选插件和 Skills 可见。
-11. 检查 `%LOCALAPPDATA%\CodexEasyStart\logs`，确认无 API Key。
+7. DeepSeek 路径中确认 Key 输入不回显，使用 `ccswitch://` 显示官方导入确认，并以 `enabled=true` 将 Provider 设为当前项。
+8. 在 CC Switch 打开本地路由总开关与 Codex 接管；确认 EasyStart 检测到本地 `/health` 后才报告完成。
+9. OCR 使用测试图片完成一次真实识别；原生多模态提示可跳过。
+10. 北大法宝完成一次最小检索调用。
+11. 重启 Codex，确认已选插件和 Skills 可见。
+12. 检查 `%LOCALAPPDATA%\CodexEasyStart\logs`，确认无 API Key。

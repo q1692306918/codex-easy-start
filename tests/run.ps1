@@ -35,6 +35,15 @@ try {
     Remove-Item -LiteralPath $ccFixture -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+$routeFixture = Join-Path $env:TEMP ("ces-route-test-" + [Guid]::NewGuid().ToString('N') + '.toml')
+try {
+    [IO.File]::WriteAllText($routeFixture, "[model_providers.cc_switch]`nbase_url = `"http://127.0.0.1:15721/v1`"")
+    $route = Get-CCSwitchCodexRouteEndpoint -ConfigPath $routeFixture
+    Assert ($route.BaseUrl -eq 'http://127.0.0.1:15721/v1' -and $route.Port -eq 15721) '解析 CC Switch Codex 本地路由地址'
+} finally {
+    Remove-Item -LiteralPath $routeFixture -Force -ErrorAction SilentlyContinue
+}
+
 $ranges = @(Get-DownloadRanges 10 4)
 Assert ($ranges.Count -eq 4) '并行下载拆分为四段'
 Assert ($ranges[0].Start -eq 0 -and $ranges[-1].End -eq 9) '下载分段完整覆盖文件'
@@ -72,6 +81,9 @@ $wordingText = @(
 ) -join "`n"
 Assert ($wordingText -notmatch '其中包含 Codex|Codex 当前包含在|确认包含 Codex') '不再把 ChatGPT 描述成 Codex 容器'
 Assert ($wordingText -match 'Codex 已改名为 ChatGPT') '统一说明 Codex 已改名为 ChatGPT'
+Assert ($moduleText -match 'ccswitch://v1/import\?') 'DeepSeek 使用 CC Switch 官方 Deep Link API'
+Assert ($moduleText -match "enabled = 'true'") 'DeepSeek Provider 导入后自动设为当前供应商'
+Assert ($moduleText -match 'Confirm-CCSwitchCodexRoute') 'DeepSeek 完成前验证 CC Switch 本地路由'
 
 $skills = Get-Content -LiteralPath (Join-Path $root 'config\skills.json') -Raw | ConvertFrom-Json
 Assert (@($skills.skills | Where-Object { $_.available -and -not $_.license }).Count -eq 0) '公开镜像 Skill 均有许可证'

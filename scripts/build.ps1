@@ -58,7 +58,7 @@ try {
         })
     }
     $items.Add([ordered]@{
-        id = 'easy-start-core'; version = '1.0.3'; url = "$BaseUrl/artifacts/easy-start-core.zip"
+        id = 'easy-start-core'; version = '1.0.4'; url = "$BaseUrl/artifacts/easy-start-core.zip"
         file = 'artifacts/easy-start-core.zip'; size = (Get-Item $coreZip).Length
         sha256 = (Get-FileHash -Algorithm SHA256 $coreZip).Hash.ToLowerInvariant()
         source = 'q1692306918/codex-easy-start'; sourceUrl = 'https://github.com/q1692306918/codex-easy-start'

@@ -267,6 +267,50 @@ function Set-UserSecret([string]$Name, [string]$Value) {
     Set-Item -Path "Env:$Name" -Value $Value
 }
 
+function Get-CCSwitchCurrentCodexProviderId {
+    $settingsPath = Join-Path $HOME '.cc-switch\settings.json'
+    if (-not (Test-Path -LiteralPath $settingsPath)) { return $null }
+    try {
+        $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $property = $settings.PSObject.Properties['currentProviderCodex']
+        if ($property) { return [string]$property.Value }
+    } catch { return $null }
+    return $null
+}
+
+function Get-CCSwitchCodexRouteEndpoint([string]$ConfigPath = (Join-Path $HOME '.codex\config.toml')) {
+    if (-not (Test-Path -LiteralPath $ConfigPath)) { return $null }
+    $config = Get-Content -LiteralPath $ConfigPath -Raw
+    $match = [regex]::Match($config, '(?m)^\s*base_url\s*=\s*"(http://(?:127\.0\.0\.1|localhost):(\d+)/v1)"\s*$')
+    if (-not $match.Success) { return $null }
+    return [pscustomobject]@{ BaseUrl = $match.Groups[1].Value; Port = [int]$match.Groups[2].Value }
+}
+
+function Confirm-CCSwitchCodexRoute([string]$CCSwitchPath) {
+    Write-Host "`n请在 CC Switch 完成以下设置："
+    Write-Host '  1. 确认导入 DeepSeek，并将 API 格式设为 OpenAI Chat Completions（需开启路由）'
+    Write-Host '  2. 打开 设置 > 路由 > 本地路由'
+    Write-Host '  3. 打开路由总开关，并在路由启用中打开 Codex'
+    if ($CCSwitchPath -and -not (Get-Process -Name 'cc-switch' -ErrorAction SilentlyContinue)) {
+        Start-Process -FilePath $CCSwitchPath
+    }
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        Read-Host '完成后回到这里按回车验证' | Out-Null
+        $route = Get-CCSwitchCodexRouteEndpoint
+        if ($route) {
+            try {
+                $health = Invoke-WebRequest -UseBasicParsing -Uri ("http://127.0.0.1:{0}/health" -f $route.Port) -TimeoutSec 3
+                if ($health.StatusCode -eq 200) {
+                    Write-Ok "CC Switch 本地路由已运行（$($route.BaseUrl)）"
+                    return $true
+                }
+            } catch { }
+        }
+        if ($attempt -lt 3) { Write-Warn '尚未检测到 Codex 本地路由，请检查两个路由开关后重试。' }
+    }
+    throw '未检测到 CC Switch 的 Codex 本地路由，DeepSeek 配置尚未完成。'
+}
+
 function Configure-DeepSeek($Manifest, [string]$WorkDir) {
     Write-Step '配置 DeepSeek'
     Install-CCSwitch $Manifest $WorkDir | Out-Null
@@ -279,14 +323,24 @@ function Configure-DeepSeek($Manifest, [string]$WorkDir) {
         $null = Invoke-RestMethod -Method Post -Uri 'https://api.deepseek.com/chat/completions' -Headers @{ Authorization = "Bearer $key" } -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($testBody))
         Write-Ok 'DeepSeek 连接测试通过'
     } catch { throw "DeepSeek 连接测试失败：$($_.Exception.Message)" }
+    $beforeProviderId = Get-CCSwitchCurrentCodexProviderId
     $query = @{
         resource = 'provider'; app = 'codex'; name = 'DeepSeek'
         endpoint = 'https://api.deepseek.com'; apiKey = $key; model = 'deepseek-chat'
+        homepage = 'https://platform.deepseek.com'; icon = 'deepseek'; enabled = 'true'
     }
     $parts = foreach ($item in $query.GetEnumerator()) { "$([Uri]::EscapeDataString($item.Key))=$([Uri]::EscapeDataString([string]$item.Value))" }
     Start-Process ("ccswitch://v1/import?" + ($parts -join '&'))
-    Write-Host '请在 CC Switch 弹窗中确认导入；是否启用由您在 CC Switch 中确认。'
-    Write-Ok 'DeepSeek 配置已发送到 CC Switch'
+    Write-Host 'CC Switch 已打开官方导入确认框；确认后会把 DeepSeek 设为当前 Provider。'
+    Read-Host '确认导入后回到这里按回车继续' | Out-Null
+    $afterProviderId = Get-CCSwitchCurrentCodexProviderId
+    if (-not $afterProviderId -or $afterProviderId -eq $beforeProviderId) {
+        throw '未检测到新的 DeepSeek Provider，请在 CC Switch 中确认导入后重试。'
+    }
+    Write-Ok 'DeepSeek Provider 已由 CC Switch 导入并启用'
+    $ccSwitchPath = (Get-EasyStartState).CCSwitchPath
+    Confirm-CCSwitchCodexRoute -CCSwitchPath $ccSwitchPath | Out-Null
+    Write-Ok 'DeepSeek 已通过 CC Switch 本地路由应用到 ChatGPT（原 Codex）'
     $key = $null
 }
 
