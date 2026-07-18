@@ -65,12 +65,13 @@ try {
             license = $skill.license; offlineReady = $true
         })
     }
-    [ordered]@{
+    $manifestJson = [ordered]@{
         schemaVersion = 1
         generatedAt = [DateTime]::UtcNow.ToString('o')
         baseUrl = $BaseUrl
         artifacts = $items
-    } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $dist 'manifest.json') -Encoding UTF8
+    } | ConvertTo-Json -Depth 10
+    [IO.File]::WriteAllText((Join-Path $dist 'manifest.json'), $manifestJson, (New-Object Text.UTF8Encoding($false)))
 
     @"
 <!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Codex EasyStart</title><style>body{font:16px/1.65 system-ui;margin:40px auto;max-width:760px;padding:0 20px;color:#202124}code{background:#f3f4f6;padding:12px;display:block;overflow:auto}small{color:#666}</style><h1>Codex EasyStart</h1><p>在 Windows PowerShell 中运行：</p><code>irm https://plugin.yuniannian.asia/install.ps1 | iex</code><p><small>安装文件由境内镜像提供并校验 SHA-256。Codex 官方启动器仍可能需要连接微软服务。</small></p></html>

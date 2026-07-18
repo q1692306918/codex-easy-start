@@ -50,7 +50,8 @@ function Read-Secret([string]$Prompt) {
 
 function Get-RemoteManifest([string]$BaseUrl) {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    return Invoke-RestMethod -UseBasicParsing -Uri "$BaseUrl/manifest.json"
+    $response = Invoke-WebRequest -UseBasicParsing -Uri "$BaseUrl/manifest.json"
+    return $response.Content | ConvertFrom-Json
 }
 
 function Save-Artifact($Manifest, [string]$Id, [string]$Destination) {

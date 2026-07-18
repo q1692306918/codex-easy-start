@@ -76,7 +76,13 @@ server {
     listen 80;
     listen [::]:80;
     server_name $Domain;
-    return 301 https://`$host`$request_uri;
+    root /var/www/codex-easy-start/current;
+    location ^~ /.well-known/acme-challenge/ {
+        try_files `$uri =404;
+    }
+    location / {
+        return 301 https://`$host`$request_uri;
+    }
 }
 server {
     listen 127.0.0.1:9443 ssl;
@@ -145,35 +151,42 @@ for item in manifest['artifacts']:
 print('all artifact hashes verified')
 PY
 ln -sfn "`$release" /var/www/codex-easy-start/current
-echo '$bootstrap64' | base64 -d > /etc/nginx/sites-available/codex-easy-start
-ln -sfn /etc/nginx/sites-available/codex-easy-start /etc/nginx/sites-enabled/codex-easy-start
-nginx -t
-systemctl enable --now nginx
-systemctl reload nginx
+if [ ! -f '/etc/letsencrypt/live/$Domain/fullchain.pem' ]; then
+  echo '$bootstrap64' | base64 -d > /etc/nginx/sites-available/codex-easy-start
+  ln -sfn /etc/nginx/sites-available/codex-easy-start /etc/nginx/sites-enabled/codex-easy-start
+  nginx -t
+  systemctl enable --now nginx
+  systemctl reload nginx
+fi
 certbot certonly --webroot -w /var/www/codex-easy-start/current -d '$Domain' --cert-name '$Domain' --non-interactive --agree-tos --register-unsafely-without-email --keep-until-expiring
 
 cp -n /usr/local/etc/xray/config.json /usr/local/etc/xray/config.json.easystart.bak || true
-XRAY_CONFIG=/usr/local/etc/xray/config.json python3 - <<'PY'
+xray_changed=`$(XRAY_CONFIG=/usr/local/etc/xray/config.json python3 - <<'PY'
 import json, os, tempfile
 path = os.environ['XRAY_CONFIG']
 with open(path) as f:
     data = json.load(f)
 found = False
+changed = False
 for inbound in data.get('inbounds', []):
     stream = inbound.get('streamSettings', {})
     if stream.get('security') == 'reality' and inbound.get('port') in (443, 8443):
+        changed = changed or inbound.get('listen') != '127.0.0.1' or inbound.get('port') != 8443
         inbound['listen'] = '127.0.0.1'
         inbound['port'] = 8443
         found = True
 if not found:
     raise SystemExit('xray REALITY inbound not found')
-fd, temp = tempfile.mkstemp(dir=os.path.dirname(path))
-with os.fdopen(fd, 'w') as f:
-    json.dump(data, f, indent=2)
-    f.write('\n')
-os.chmod(temp, 0o644)
-os.replace(temp, path)
+if changed:
+    fd, temp = tempfile.mkstemp(dir=os.path.dirname(path))
+    with os.fdopen(fd, 'w') as f:
+        json.dump(data, f, indent=2)
+        f.write('\n')
+    os.chmod(temp, 0o644)
+    os.replace(temp, path)
+print('yes' if changed else 'no')
 PY
+)
 /usr/local/bin/xray run -test -config /usr/local/etc/xray/config.json
 
 mkdir -p /etc/nginx/streams-enabled
@@ -181,8 +194,8 @@ grep -qxF 'include /etc/nginx/streams-enabled/*.conf;' /etc/nginx/nginx.conf || 
 echo '$final64' | base64 -d > /etc/nginx/sites-available/codex-easy-start
 echo '$stream64' | base64 -d > /etc/nginx/streams-enabled/easystart-sni.conf
 nginx -t
-systemctl restart xray
-systemctl restart nginx
+if [ "`$xray_changed" = yes ]; then systemctl restart xray; fi
+systemctl reload nginx
 test "`$(systemctl is-active xray)" = active
 test "`$(systemctl is-active nginx)" = active
 curl -fsS --resolve '${Domain}:443:127.0.0.1' 'https://$Domain/manifest.json' >/dev/null

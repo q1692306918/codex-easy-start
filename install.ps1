@@ -6,7 +6,8 @@ try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     New-Item -ItemType Directory -Path $work -Force | Out-Null
     Write-Host '正在获取 Codex EasyStart...' -ForegroundColor Cyan
-    $manifest = Invoke-RestMethod -UseBasicParsing -Uri "$BaseUrl/manifest.json"
+    $manifestResponse = Invoke-WebRequest -UseBasicParsing -Uri "$BaseUrl/manifest.json"
+    $manifest = $manifestResponse.Content | ConvertFrom-Json
     $artifact = $manifest.artifacts | Where-Object { $_.id -eq 'easy-start-core' } | Select-Object -First 1
     if (-not $artifact) { throw '发布清单缺少 easy-start-core。' }
     $zip = Join-Path $work 'easy-start-core.zip'
@@ -22,4 +23,3 @@ try {
 } finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 }
-
