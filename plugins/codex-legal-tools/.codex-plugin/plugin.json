@@ -1,0 +1,21 @@
+{
+  "name": "codex-legal-tools",
+  "version": "1.0.0",
+  "description": "PKULaw search, document retrieval, citation validation, and legal recognition tools.",
+  "author": { "name": "Codex EasyStart" },
+  "homepage": "https://plugin.yuniannian.asia",
+  "repository": "https://github.com/q1692306918/codex-easy-start",
+  "license": "MIT",
+  "keywords": ["law", "pkulaw", "legal", "china"],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "北大法宝法律工具",
+    "shortDescription": "检索法规案例并校验法律引用",
+    "longDescription": "接入北大法宝的法规、案例、法条识别、案号识别和引用校验能力。",
+    "developerName": "Codex EasyStart",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": ["检索与这个法律问题相关的法规和案例"]
+  }
+}
+

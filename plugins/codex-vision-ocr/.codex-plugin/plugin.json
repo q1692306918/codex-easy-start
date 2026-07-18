@@ -1,0 +1,22 @@
+{
+  "name": "codex-vision-ocr",
+  "version": "1.0.0",
+  "description": "Give text-only models image and scanned-document recognition through Bailian.",
+  "author": { "name": "Codex EasyStart" },
+  "homepage": "https://plugin.yuniannian.asia",
+  "repository": "https://github.com/q1692306918/codex-easy-start",
+  "license": "MIT",
+  "keywords": ["ocr", "vision", "bailian", "qwen"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "图片与扫描件识别",
+    "shortDescription": "让纯语言模型识别图片和扫描件",
+    "longDescription": "让 DeepSeek 等不能直接看图的模型获得识图能力；原生支持图片的模型无需安装。",
+    "developerName": "Codex EasyStart",
+    "category": "Productivity",
+    "capabilities": ["Write"],
+    "defaultPrompt": ["识别这张图片中的文字和结构"]
+  }
+}
+

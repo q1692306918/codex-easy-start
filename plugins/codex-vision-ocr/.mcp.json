@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "easystart_ocr": {
+      "command": "powershell.exe",
+      "args": ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "./server/ocr-mcp.ps1"],
+      "cwd": "."
+    }
+  }
+}
+

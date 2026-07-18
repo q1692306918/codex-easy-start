@@ -1,0 +1,49 @@
+﻿{
+  "schemaVersion": 1,
+  "skills": [
+    {
+      "id": "legal-skills-chinese",
+      "name": "Legal-Skills-Chinese",
+      "description": "按法律人的方式进行检索、事实提取、推理和文书生成",
+      "recommended": true,
+      "source": "THUYRan/Legal-Skills-Chinese",
+      "commit": "d844a25f6d5e6eff4999774a9ab0f79f7cb9d22d",
+      "license": null,
+      "mirrorFile": null,
+      "available": false
+    },
+    {
+      "id": "china-legal-counsel",
+      "name": "china-legal-counsel",
+      "description": "合同审查、起草、法律咨询和合规检查",
+      "recommended": false,
+      "source": "Daknniel-0881/qulv-china-legal-counsel-skill",
+      "commit": "73ff53a857ffbdd91296bf41ed5bcc1294bc2042",
+      "license": "MIT",
+      "mirrorFile": "skills/china-legal-counsel.zip",
+      "available": true
+    },
+    {
+      "id": "china-law-case-analysis",
+      "name": "china-law-case-analysis",
+      "description": "提取案例中的裁判规则",
+      "recommended": false,
+      "source": "wesky820/china-law-case-analysis-skills",
+      "commit": "572d274985214740e37cf5d03149431f643838c6",
+      "license": null,
+      "mirrorFile": null,
+      "available": false
+    },
+    {
+      "id": "humanizer-zh",
+      "name": "humanizer-zh",
+      "description": "让生成文字读起来更自然",
+      "recommended": false,
+      "source": "op7418/Humanizer-zh",
+      "commit": "91f3d394db8419c20d67ebe22a96cf8fee0a404b",
+      "license": "MIT",
+      "mirrorFile": "skills/humanizer-zh.zip",
+      "available": true
+    }
+  ]
+}

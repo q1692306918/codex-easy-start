@@ -1,0 +1,37 @@
+﻿{
+  "schemaVersion": 1,
+  "baseUrl": "https://plugin.yuniannian.asia",
+  "artifacts": [
+    {
+      "id": "codex-store-bootstrapper",
+      "version": "2026-07-18",
+      "file": "artifacts/ChatGPT-Installer.exe",
+      "source": "Microsoft Store official bootstrapper",
+      "sourceUrl": "https://apps.microsoft.com/detail/9PLM9XGG6VKS",
+      "license": "Proprietary",
+      "offlineReady": false,
+      "sha256": "BUILD_TIME"
+    },
+    {
+      "id": "cc-switch-x64",
+      "version": "3.17.0",
+      "file": "artifacts/CC-Switch-v3.17.0-Windows.msi",
+      "source": "farion1231/cc-switch",
+      "sourceUrl": "https://github.com/farion1231/cc-switch/releases/tag/v3.17.0",
+      "license": "MIT",
+      "offlineReady": true,
+      "sha256": "c541e1981023cc5cfe4d8357ce9c57a712eb8949bf2ae8cd49b087c75762607b"
+    },
+    {
+      "id": "cc-switch-arm64",
+      "version": "3.17.0",
+      "file": "artifacts/CC-Switch-v3.17.0-Windows-arm64.msi",
+      "source": "farion1231/cc-switch",
+      "sourceUrl": "https://github.com/farion1231/cc-switch/releases/tag/v3.17.0",
+      "license": "MIT",
+      "offlineReady": true,
+      "sha256": "e3b5c01d4d12914f3f98f715d386aeddb9ceaa39981984cb05f3050163933b6e"
+    }
+  ]
+}
+
